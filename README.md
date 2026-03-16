@@ -43,16 +43,16 @@ cat main.py | ollama run devstral-2:123b "이 코드의 버그를 찾아줘"
 cat src/*.go | ollama run devstral-2:123b "이 프로젝트 구조를 설명해줘"
 
 # 임시 파일에 분석할 내용을 작성한 뒤 LLM에 전달
-cat <<'EOF' > /tmp/analyze.txt
+cat <<'EOF' > tmp/analyze.txt
 여기에 분석할 코드나 텍스트를 붙여넣기
 EOF
-cat /tmp/analyze.txt | ollama run devstral-2:123b "이 내용을 분석해줘"
+cat tmp/analyze.txt | ollama run devstral-2:123b "이 내용을 분석해줘"
 
 # 또는 한 줄로
-echo "분석할 내용" > /tmp/q.txt && cat /tmp/q.txt | ollama run devstral-2:123b "분석해줘"
+echo "분석할 내용" > tmp/q.txt && cat tmp/q.txt | ollama run devstral-2:123b "분석해줘"
 
 # 분석 결과를 파일로 저장
-cat /tmp/analyze.txt | ollama run devstral-2:123b "이 코드를 리뷰해줘" > /tmp/result.txt
+cat tmp/analyze.txt | ollama run devstral-2:123b "이 코드를 리뷰해줘" > tmp/result.txt
 ```
 
 ### REST API
@@ -160,5 +160,6 @@ myllm/
 ├── install_devstral2.sh   # 설치 스크립트
 ├── benchmark.py           # 성능 벤치마크
 ├── doc_edu/               # 문서
-└── experiments/            # 실험
+├── experiments/           # 실험
+└── tmp/                   # 임시 파일 (git 추적 안 함)
 ```
