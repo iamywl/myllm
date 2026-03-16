@@ -55,6 +55,23 @@ echo "분석할 내용" > tmp/q.txt && cat tmp/q.txt | ollama run devstral-2:123
 cat tmp/analyze.txt | ollama run devstral-2:123b "이 코드를 리뷰해줘" > tmp/result.txt
 ```
 
+### 채팅 모드 (대화 맥락 기억)
+
+```bash
+# 새 세션 시작
+./chat.sh 상담
+
+# 입력 후 빈 줄(Enter)로 전송, quit로 종료
+# 파일 내용을 보내려면 @경로 입력
+나> @tmp/q.txt
+나> 위 분석에서 2번 항목을 더 자세히 설명해줘
+나> quit
+```
+
+- 대화 기록이 `tmp/chat/세션명.json`에 자동 저장됨
+- 같은 세션명으로 다시 실행하면 이전 대화를 이어감
+- 세션명 없이 `./chat.sh`만 실행하면 `default` 세션 사용
+
 ### REST API
 
 ```bash
@@ -158,6 +175,7 @@ brew services info ollama     # 상태 확인
 myllm/
 ├── README.md              # 이 문서
 ├── install_devstral2.sh   # 설치 스크립트
+├── chat.sh                # 채팅 스크립트 (대화 맥락 기억)
 ├── benchmark.py           # 성능 벤치마크
 ├── doc_edu/               # 문서
 ├── experiments/           # 실험
