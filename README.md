@@ -41,6 +41,18 @@ cat main.py | ollama run devstral-2:123b "이 코드의 버그를 찾아줘"
 
 # 여러 파일 한번에
 cat src/*.go | ollama run devstral-2:123b "이 프로젝트 구조를 설명해줘"
+
+# 임시 파일에 분석할 내용을 작성한 뒤 LLM에 전달
+cat <<'EOF' > /tmp/analyze.txt
+여기에 분석할 코드나 텍스트를 붙여넣기
+EOF
+cat /tmp/analyze.txt | ollama run devstral-2:123b "이 내용을 분석해줘"
+
+# 또는 한 줄로
+echo "분석할 내용" > /tmp/q.txt && cat /tmp/q.txt | ollama run devstral-2:123b "분석해줘"
+
+# 분석 결과를 파일로 저장
+cat /tmp/analyze.txt | ollama run devstral-2:123b "이 코드를 리뷰해줘" > /tmp/result.txt
 ```
 
 ### REST API
