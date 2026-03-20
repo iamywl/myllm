@@ -25,6 +25,33 @@ brew services start ollama
 ./install_devstral2.sh
 ```
 
+---
+
+## 빠른 시작
+
+### 전체 흐름: 시작 → 사용 → 확인 → 종료
+
+```bash
+# 1. Ollama 시작
+brew services start ollama
+
+# 2. 사용 (아래 방법 중 택1)
+ollama run devstral-2:123b                  # 터미널 대화
+./chat.sh Tech                              # 터미널 채팅 (맥락 기억)
+python3 web_chat.py                         # 웹 챗봇
+
+# 3. 모델이 메모리에 올라가 있는지 확인
+curl -s http://localhost:11434/api/ps | python3 -m json.tool
+
+# 4. 작업 끝나면 모델 내리기 (126GB 메모리 해제)
+curl http://localhost:11434/api/generate -d '{"model":"devstral-2:123b","keep_alive":0}'
+
+# 5. Ollama까지 완전히 끄기 (선택)
+brew services stop ollama
+```
+
+---
+
 ## 사용법
 
 ### 터미널
@@ -72,6 +99,31 @@ cat tmp/analyze.txt | ollama run devstral-2:123b "이 코드를 리뷰해줘" > 
 - 같은 세션명으로 다시 실행하면 이전 대화를 이어감
 - 세션명 없이 `./chat.sh`만 실행하면 `default` 세션 사용
 
+### 웹 챗봇
+
+```bash
+# 1. 서버 시작 (시작 시 GPU 기반 타임아웃 자동 측정)
+python3 web_chat.py
+
+# 2. 브라우저에서 접속
+open http://localhost:60000
+```
+
+- **Tech 세션**: 기술 상담. RAG로 모든 대화 기록을 검색하여 관련 맥락을 자동 참조
+- **Mental 세션**: 심리 상담. 공감 중심 대화 (전체 맥락 전송, 256K 초과 시 RAG 자동 전환)
+- 세션 전환은 상단 드롭다운에서 선택
+- 새 세션을 만들려면 세션명 입력 후 "새 세션" 클릭
+- 대화 기록은 `tmp/chat/`에 저장 (터미널 채팅과 공유, git 추적 안 함)
+- RAG 벡터 DB는 `tmp/rag/`에 저장 (git 추적 안 함)
+
+#### 기존 대화 기록 인덱싱
+
+서버 시작 시 자동으로 인덱싱하지만, 수동 실행도 가능하다.
+
+```bash
+python3 migrate_history.py
+```
+
 ### REST API
 
 ```bash
@@ -118,6 +170,67 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
+---
+
+## 상태 확인
+
+```bash
+# 모델이 메모리에 올라가 있는지 확인
+curl -s http://localhost:11434/api/ps | python3 -m json.tool
+```
+
+- `"models": []` → 모델이 메모리에 **없음** (해제된 상태)
+- `"models": [...]` → 모델이 메모리에 **올라가 있음**
+  - `size`: 모델 전체 크기 (~126GB)
+  - `size_vram`: GPU에 올라간 양 (~102GB, 81%)
+  - 나머지 ~24GB는 CPU/RAM에서 처리 (19%)
+
+```bash
+# Ollama 서비스 상태 확인
+brew services info ollama
+
+# 설치된 모델 목록
+ollama list
+
+# 모델 상세 정보
+ollama show devstral-2:123b
+```
+
+---
+
+## 종료 (작업 후 반드시 확인)
+
+123B 모델은 **~126GB 메모리**를 점유한다. 작업이 끝나면 반드시 해제해야 한다.
+
+### 단계별 종료
+
+```bash
+# 1단계: 웹 챗봇 종료 (사용한 경우)
+#   - 웹 UI에서 "서버 종료" 버튼 클릭
+#   - 또는 터미널에서 Ctrl+C
+
+# 2단계: 모델을 메모리에서 내리기
+curl http://localhost:11434/api/generate -d '{"model":"devstral-2:123b","keep_alive":0}'
+
+# 3단계: 해제 확인 (models가 빈 배열이면 완료)
+curl -s http://localhost:11434/api/ps | python3 -m json.tool
+
+# 4단계 (선택): Ollama 서비스 자체를 종료
+brew services stop ollama
+```
+
+### 종료 방법 비교
+
+| 방법 | 명령어 | 모델 메모리 | Ollama 서비스 | 다시 시작하려면 |
+|------|--------|------------|--------------|----------------|
+| 모델만 내리기 | `curl ...keep_alive:0` | 해제 | 유지 | 바로 사용 가능 (자동 재로드) |
+| Ollama 종료 | `brew services stop ollama` | 해제 | 종료 | `brew services start ollama` |
+| 웹 챗봇만 종료 | Ctrl+C 또는 UI 버튼 | **유지됨** | 유지 | `python3 web_chat.py` |
+
+> **주의**: 웹 챗봇을 종료해도 모델은 메모리에 남아있다. 반드시 2단계(모델 내리기)를 해야 126GB가 해제된다.
+
+---
+
 ## 벤치마크
 
 ```bash
@@ -133,13 +246,7 @@ ollama list
 # 모델 상세 정보
 ollama show devstral-2:123b
 
-# 메모리에 로드된 모델 확인
-curl -s http://localhost:11434/api/ps | python3 -m json.tool
-
-# 메모리에서 언로드 (삭제 아님)
-curl http://localhost:11434/api/generate -d '{"model":"devstral-2:123b","keep_alive":0}'
-
-# 모델 삭제
+# 모델 삭제 (디스크에서 완전 제거, 75GB 확보)
 ollama rm devstral-2:123b
 ```
 
@@ -160,11 +267,11 @@ ollama rm devstral-2:123b
 | `temperature` | 0.8 | 0.1~0.3 | 코드 생성 시 낮을수록 정확 |
 | `num_predict` | 128 | -1 | 최대 생성 토큰. -1은 무제한 |
 
-## 서비스 관리
+## Ollama 서비스 관리
 
 ```bash
 brew services start ollama    # 시작
-brew services stop ollama     # 중지
+brew services stop ollama     # 종료
 brew services restart ollama  # 재시작
 brew services info ollama     # 상태 확인
 ```
@@ -176,8 +283,11 @@ myllm/
 ├── README.md              # 이 문서
 ├── install_devstral2.sh   # 설치 스크립트
 ├── chat.sh                # 채팅 스크립트 (대화 맥락 기억)
+├── web_chat.py            # 웹 챗봇 서버 (RAG 통합)
+├── rag_store.py           # RAG 임베딩 저장소 모듈
+├── migrate_history.py     # 대화 기록 → 벡터 DB 마이그레이션
 ├── benchmark.py           # 성능 벤치마크
-├── doc_edu/               # 문서
+├── doc_edu/               # 교육 문서
 ├── experiments/           # 실험
-└── tmp/                   # 임시 파일 (git 추적 안 함)
+└── tmp/                   # 임시 파일, 대화 기록, 벡터 DB (git 추적 안 함)
 ```
